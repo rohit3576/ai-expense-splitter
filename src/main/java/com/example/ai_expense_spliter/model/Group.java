@@ -1,4 +1,4 @@
-package com.expensesplitter.model;
+package com.example.ai_expense_spliter.model;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;

@@ -1,4 +1,4 @@
-package com.expensesplitter.model;
+package com.example.ai_expense_spliter.model;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -10,9 +10,9 @@ import jakarta.persistence.Table;
 import lombok.Data;
 
 @Entity
-@Table(name = "splits")
+@Table(name = "expenses")
 @Data
-public class Split {
+public class Expense {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -21,10 +21,10 @@ public class Split {
     private double amount;
 
     @ManyToOne
-    @JoinColumn(name = "user_id")
-    private User user;
+    @JoinColumn(name = "paid_by")
+    private User paidBy;
 
     @ManyToOne
-    @JoinColumn(name = "expense_id")
-    private Expense expense;
+    @JoinColumn(name = "group_id")
+    private Group group;
 }

@@ -1,31 +1,31 @@
 package com.example.ai_expense_spliter.controller;
 
-import java.util.List;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
 import com.example.ai_expense_spliter.model.Group;
 import com.example.ai_expense_spliter.service.GroupService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
 
 @RestController
-@RequestMapping("/groups")
+@RequestMapping("/api/groups")
 public class GroupController {
-
+    
     @Autowired
     private GroupService groupService;
-
+    
     @PostMapping
-    public Group create(@RequestBody Group group) {
-        return groupService.save(group);
+    public ResponseEntity<Group> createGroup(@RequestBody Group group) {
+        return ResponseEntity.ok(groupService.createGroup(group));
     }
-
+    
     @GetMapping
-    public List<Group> getAll() {
-        return groupService.getAll();
+    public ResponseEntity<List<Group>> getAllGroups() {
+        return ResponseEntity.ok(groupService.getAllGroups());
+    }
+    
+    @GetMapping("/{id}")
+    public ResponseEntity<Group> getGroupById(@PathVariable Long id) {
+        return ResponseEntity.ok(groupService.getGroupById(id));
     }
 }

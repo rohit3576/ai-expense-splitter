@@ -10,15 +10,20 @@ import com.example.ai_expense_spliter.repository.UserRepository;
 
 @Service
 public class UserService {
-
+    
     @Autowired
     private UserRepository userRepository;
-
-    public User save(User user) {
+    
+    public User createUser(User user) {
         return userRepository.save(user);
     }
-
-    public List<User> getAll() {
+    
+    public List<User> getAllUsers() {
         return userRepository.findAll();
+    }
+    
+    public User getUserById(Long id) {
+        return userRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
     }
 }

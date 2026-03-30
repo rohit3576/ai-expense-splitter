@@ -1,16 +1,33 @@
 package com.example.ai_expense_spliter.service;
 
-import com.example.ai_expense_spliter.dto.*;
-import com.example.ai_expense_spliter.model.*;
-import com.example.ai_expense_spliter.repository.*;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.util.*;
-import java.util.stream.Collectors;
+import com.example.ai_expense_spliter.dto.BalanceSummaryDTO;
+import com.example.ai_expense_spliter.dto.SettlementResponseDTO;
+import com.example.ai_expense_spliter.dto.TransactionDTO;
+import com.example.ai_expense_spliter.dto.UserBalanceDTO;
+import com.example.ai_expense_spliter.model.Expense;
+import com.example.ai_expense_spliter.model.Group;
+import com.example.ai_expense_spliter.model.Split;
+import com.example.ai_expense_spliter.model.User;
+import com.example.ai_expense_spliter.repository.ExpenseRepository;
+import com.example.ai_expense_spliter.repository.GroupRepository;
+import com.example.ai_expense_spliter.repository.SplitRepository;
+import com.example.ai_expense_spliter.repository.UserRepository;
 
 @Service
 public class SettlementService {
@@ -38,7 +55,7 @@ public class SettlementService {
         
         for (Expense expense : expenses) {
             Long paidBy = expense.getPaidBy().getId();
-            BigDecimal amount = expense.getAmount();
+            BigDecimal amount = expense.getAmount(); // This should be BigDecimal
             
             // Add to payer's balance (they are owed money)
             balances.merge(paidBy, amount, BigDecimal::add);
@@ -48,7 +65,7 @@ public class SettlementService {
             
             for (Split split : splits) {
                 Long userId = split.getUser().getId();
-                BigDecimal owedAmount = split.getAmount();
+                BigDecimal owedAmount = split.getAmount(); // This should be BigDecimal
                 
                 // Subtract from user's balance (they owe money)
                 balances.merge(userId, owedAmount.negate(), BigDecimal::add);
@@ -155,6 +172,7 @@ public class SettlementService {
                 UserBalanceDTO::getBalance
             ));
         
+        // Calculate total spent (sum of all positive balances)
         BigDecimal totalSpent = balances.stream()
             .map(UserBalanceDTO::getBalance)
             .filter(b -> b.compareTo(BigDecimal.ZERO) > 0)
@@ -186,10 +204,16 @@ public class SettlementService {
             .findFirst()
             .orElseThrow(() -> new RuntimeException("User not found in group"));
         
+        // Calculate total spent (sum of all positive balances)
         BigDecimal totalSpent = balances.stream()
             .map(UserBalanceDTO::getBalance)
             .filter(b -> b.compareTo(BigDecimal.ZERO) > 0)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        // Avoid division by zero
+        if (balances.isEmpty() || totalSpent.compareTo(BigDecimal.ZERO) == 0) {
+            return BigDecimal.valueOf(100);
+        }
         
         BigDecimal fairShare = totalSpent.divide(BigDecimal.valueOf(balances.size()), 2, RoundingMode.HALF_UP);
         BigDecimal actualNet = userBalance.getBalance();
@@ -237,14 +261,36 @@ public class SettlementService {
         
         List<Expense> expenses = expenseRepository.findByGroupId(groupId);
         
+        if (expenses.isEmpty()) {
+            insights.put("totalExpenses", BigDecimal.ZERO);
+            insights.put("averagePerPerson", BigDecimal.ZERO);
+            insights.put("numberOfExpenses", 0);
+            insights.put("highestExpense", "No expenses yet");
+            insights.put("mostActiveSpender", "No expenses yet");
+            return insights;
+        }
+        
         // Total expenses
         BigDecimal totalExpenses = expenses.stream()
             .map(Expense::getAmount)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
         
+        // Get group members from the splits
+        Set<Long> memberIds = new HashSet<>();
+        for (Expense expense : expenses) {
+            memberIds.add(expense.getPaidBy().getId());
+            List<Split> splits = splitRepository.findByExpenseId(expense.getId());
+            for (Split split : splits) {
+                memberIds.add(split.getUser().getId());
+            }
+        }
+        int memberCount = memberIds.size();
+        
         // Average expense per person
-        int memberCount = groupRepository.findById(groupId).get().getMembers().size();
-        BigDecimal avgPerPerson = totalExpenses.divide(BigDecimal.valueOf(memberCount), 2, RoundingMode.HALF_UP);
+        BigDecimal avgPerPerson = BigDecimal.ZERO;
+        if (memberCount > 0) {
+            avgPerPerson = totalExpenses.divide(BigDecimal.valueOf(memberCount), 2, RoundingMode.HALF_UP);
+        }
         
         // Highest expense
         Optional<Expense> highestExpense = expenses.stream()
@@ -262,11 +308,26 @@ public class SettlementService {
         insights.put("totalExpenses", totalExpenses);
         insights.put("averagePerPerson", avgPerPerson);
         insights.put("numberOfExpenses", expenses.size());
-        insights.put("highestExpense", highestExpense.map(e -> e.getDescription() + ": ₹" + e.getAmount()).orElse("N/A"));
         
+        // Safely handle highest expense
+        if (highestExpense.isPresent()) {
+            Expense expense = highestExpense.get();
+            String description = expense.getDescription() != null ? expense.getDescription() : "Expense";
+            insights.put("highestExpense", description + ": ₹" + expense.getAmount());
+        } else {
+            insights.put("highestExpense", "N/A");
+        }
+        
+        // Safely handle most active spender
         if (mostActive.isPresent()) {
             User user = userRepository.findById(mostActive.get().getKey()).orElse(null);
-            insights.put("mostActiveSpender", user != null ? user.getName() + " (₹" + mostActive.get().getValue() + ")" : "N/A");
+            if (user != null) {
+                insights.put("mostActiveSpender", user.getName() + " (₹" + mostActive.get().getValue() + ")");
+            } else {
+                insights.put("mostActiveSpender", "N/A");
+            }
+        } else {
+            insights.put("mostActiveSpender", "N/A");
         }
         
         return insights;

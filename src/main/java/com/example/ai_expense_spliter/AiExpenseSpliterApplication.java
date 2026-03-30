@@ -5,9 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
 public class AiExpenseSpliterApplication {
-
-	public static void main(String[] args) {
-		SpringApplication.run(AiExpenseSpliterApplication.class, args);
-	}
-
+    public static void main(String[] args) {
+        SpringApplication.run(AiExpenseSpliterApplication.class, args);
+    }
 }
